@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 import json
+from typing import Any, Callable, Dict, Iterator, Union
 
 import ndjson
+import requests
 
 from . import utils
 
@@ -16,11 +18,16 @@ class FormatHandler:
     :param str mime_type: the MIME type for the format
     """
 
-    def __init__(self, mime_type):
+    def __init__(self, mime_type: str) -> None:
         self.mime_type = mime_type
         self.headers = {'Accept': mime_type}
 
-    def handle(self, response, is_stream, converter=utils.noop):
+    def handle(
+        self,
+        response: requests.Response,
+        is_stream: bool,
+        converter: Callable = utils.noop,
+    ) -> Union[map, str]:
         """Handle the response by returning the data.
 
         :param response: raw response
@@ -34,8 +41,10 @@ class FormatHandler:
         else:
             return converter(self.parse(response))
 
-    def parse(self, response):
+    def parse(self, response: requests.Response) -> requests.Response:
         """Parse all data from a response.
+
+        This method is intended to be overridden by subclasses.
 
         :param response: raw response
         :type response: :class:`requests.Response`
@@ -43,7 +52,9 @@ class FormatHandler:
         """
         return response
 
-    def parse_stream(self, response):
+    def parse_stream(
+        self, response: requests.Response
+    ) -> Iterator[requests.Response]:
         """Yield the parsed data from a stream response.
 
         :param response: raw response
@@ -61,11 +72,13 @@ class JsonHandler(FormatHandler):
     :type decoder: :class:`json.JSONDecoder`
     """
 
-    def __init__(self, mime_type, decoder=json.JSONDecoder):
+    def __init__(
+        self, mime_type: str, decoder: type = json.JSONDecoder
+    ) -> None:
         super().__init__(mime_type=mime_type)
         self.decoder = decoder
 
-    def parse(self, response):
+    def parse(self, response: requests.Response) -> str:
         """Parse all JSON data from a response.
 
         :param response: raw response
@@ -75,7 +88,9 @@ class JsonHandler(FormatHandler):
         """
         return response.json(cls=self.decoder)
 
-    def parse_stream(self, response):
+    def parse_stream(
+        self, response: Any
+    ) -> Iterator[Union[Iterator, Iterator[Dict[str, int]]]]:
         """Yield the parsed data from a stream response.
 
         :param response: raw response
@@ -91,14 +106,14 @@ class JsonHandler(FormatHandler):
 class PgnHandler(FormatHandler):
     """Handle PGN data."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(mime_type='application/x-chess-pgn')
 
     def handle(self, *args, **kwargs):
         kwargs['converter'] = utils.noop  # disable conversions
         return super().handle(*args, **kwargs)
 
-    def parse(self, response):
+    def parse(self, response: Any) -> str:
         """Parse all text data from a response.
 
         :param response: raw response
@@ -108,7 +123,9 @@ class PgnHandler(FormatHandler):
         """
         return response.text
 
-    def parse_stream(self, response):
+    def parse_stream(
+        self, response: requests.Response
+    ) -> Iterator[Union[Iterator, Iterator[str]]]:
         """Yield the parsed PGN games from a stream response.
 
         :param response: raw response
